@@ -1,0 +1,29 @@
+配置一个DTS同步任务，把源端北京地域的RDS MySQL实例rm-2zeh7r8q3a27y4z42的数据同步到目标端北京地域的RDS MySQL实例rm-2zelo97256j3r6tk5，源端RDS实例用户使用dts，源端RDS实例密码使用DTStest1234，目标端RDS实例用户使用dts，目标端RDS实例密码使用DTStest1234
+
+-----
+
+ConfigureDtsJob
+配置一个DTS迁移任务，把源端杭州地域的RDS MySQL实例rm-bp1f9guj5rhzqpn7y的数据迁移到目标端杭州地域的RDS MySQL实例rm-bp1hzv0k209d6xwk6，源端RDS实例用户使用dts，源端RDS实例密码使用DTStest1234%^&*，目标端RDS实例用户使用dts，目标端RDS实例密码使用DTStest1234
+
+迁移单个表
+配置一个DTS迁移任务，把源端杭州地域的RDS MySQL实例rm-bp1f9guj5rhzqpn7y的数据迁移到目标端杭州地域的RDS MySQL实例rm-bp1hzv0k209d6xwk6，源端RDS实例用户使用dts，源端RDS实例密码使用DTStest1234%^&*，目标端RDS实例用户使用dts，目标端RDS实例密码使用DTStest1234，迁移dtstest库下面的dts1表
+
+同步对象db_list，使用：{"dtstest":{"name":"dtstest","all":false,"Table":{"dts1":{"name":"dts1","all":true}}}}
+
+同步对象db_list，使用：[file_url]；备注：可以减少query token消耗
+
+迁移多个表
+配置一个DTS迁移任务，把源端杭州地域的RDS MySQL实例rm-bp1f9guj5rhzqpn7y的数据迁移到目标端杭州地域的RDS MySQL实例rm-bp1hzv0k209d6xwk6，源端RDS实例用户使用dts，源端RDS实例密码使用DTStest1234%^&*，目标端RDS实例用户使用dts，目标端RDS实例密码使用DTStest1234，迁移dtstest库下面的表：task01、task02
+
+迁移整库
+配置一个DTS迁移任务，把源端杭州地域的RDS MySQL实例rm-bp1f9guj5rhzqpn7y的数据迁移到目标端杭州地域的RDS MySQL实例rm-bp1hzv0k209d6xwk6，源端RDS实例用户使用dts，源端RDS实例密码使用DTStest1234%^&*，目标端RDS实例用户使用dts，目标端RDS实例密码使用DTStest1234，迁移dtstest库
+
+-----
+
+StartDtsJob
+启动杭州地域的DTS任务 sh9e564n13o441y
+
+-----
+
+DescribeDtsJobDetail
+查询杭州地域的DTS任务 odar5x6z13ss36s 的进度信息
