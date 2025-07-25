@@ -251,6 +251,7 @@ async def describe_dts_job_detail(
 
 
 def main():
+    print("Hello from alibabacloud-dts-mcp-server!")
     mcp.run(transport=os.getenv('SERVER_TRANSPORT', 'stdio'))
 
 
