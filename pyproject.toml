@@ -12,3 +12,6 @@ dependencies = [
 
 license = "Apache-2.0"
 license-files = ["LICENSE"]
+
+[project.scripts]
+alibabacloud-dts-mcp-server = "alibabacloud_dts_mcp_server.server:main"
