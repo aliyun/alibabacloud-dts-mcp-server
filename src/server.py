@@ -2,26 +2,23 @@ import json
 import logging
 import os
 import sys
+import random
+import string
 from datetime import datetime
 from typing import Dict, Any, List
 from pydantic import Field
 
 from alibabacloud_dts20200101 import models as dts_20200101_models
+from alibabacloud_dts20200101.client import Client as DtsClient
+from alibabacloud_tea_openapi.models import Config
 from alibabacloud_tea_util import models as util_models
-from alibabacloud_tea_util.client import Client as UtilClient
 
 from mcp.server.fastmcp import FastMCP
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(current_dir)
-from utils import (get_dts_client)
 
 logger = logging.getLogger(__name__)
 
 mcp = FastMCP(
-    name="dts-mcp-server",
-    host="0.0.0.0",
-    port=8002
+    name="dts-mcp-server"
 )
 
 g_db_list = '''{
@@ -29,8 +26,8 @@ g_db_list = '''{
         "name": "dtstest",
         "all": false,
         "Table": {
-            "dts1": {
-                "name": "dts1_tgt_#suffix#",
+            "table1": {
+                "name": "table1",
                 "all": true
             }
         }
@@ -57,12 +54,26 @@ g_reserved = '''{
     "srcMySQLType": "HighAvailability",
     "destSSL": "0",
     "a2aFlag": "2.0",
-    "skipPrechecks": "CHECK_SAME_OBJ",
+    "channelInfo": "mcp",
     "autoStartModulesAfterConfig": "none"
 }
 '''
 
-@mcp.tool(name="configure_dts_job",
+def get_dts_client(region_id: str):
+    config = Config(
+        access_key_id=os.getenv('ALIBABA_CLOUD_ACCESS_KEY_ID'),
+        access_key_secret=os.getenv('ALIBABA_CLOUD_ACCESS_KEY_SECRET'),
+        security_token=os.getenv('ALIBABA_CLOUD_SECURITY_TOKEN'),
+        region_id=region_id,
+        protocol="https",
+        connect_timeout=10 * 1000,
+        read_timeout=300 * 1000
+    )
+    client = DtsClient(config)
+    return client
+
+
+@mcp.tool(name="configureDtsJob",
           description="Configure a dts job.",
           annotations={"title": "配置DTS任务", "readOnlyHint": False, "destructiveHint": False})
 async def configure_dts_job(
@@ -80,9 +91,9 @@ async def configure_dts_job(
         destination_endpoint_instance_id: str = Field(description="The destination endpoint instance ID (e.g., 'rm-xxx')"),
         destination_endpoint_user_name: str = Field(description="The destination endpoint user name"),
         destination_endpoint_password: str = Field(description="The destination endpoint password"),
-        db_list: Any = Field(description="The database objects in JSON format, including obejct type like: Database、Table")
+        db_list: Dict[str, Any] = Field(description='The database objects in JSON format, example 1: migration dtstest database, db_list should like {"dtstest":{"name":"dtstest","all":true}}; example 2: migration one table task01 in dtstest database, db_list should like {"dtstest":{"name":"dtstest","all":false,"Table":{"task01":{"name":"task01","all":true}}}}; example 3: migration two tables task01 and task02 in dtstest database, db_list should like {"dtstest":{"name":"dtstest","all":false,"Table":{"task01":{"name":"task01","all":true},"task02":{"name":"task02","all":true}}}}')
 ) -> Dict[str, Any]:
-    """Configure a dts job.
+    '''Configure a dts job.
 
     Args:
         region_id: Region ID.
@@ -99,11 +110,11 @@ async def configure_dts_job(
         destination_endpoint_instance_id: The destination endpoint instance ID (e.g., "rm-xxx").
         destination_endpoint_user_name: The destination endpoint user name.
         destination_endpoint_password: The destination endpoint password.
-        db_list: The database objects in JSON format, including obejct type like: Database、Table.
+        db_list: The database objects in JSON format, example 1: migration dtstest database, db_list should like {"dtstest":{"name":"dtstest","all":true}}; example 2: migration one table task01 in dtstest database, db_list should like {"dtstest":{"name":"dtstest","all":false,"Table":{"task01":{"name":"task01","all":true}}}}; example 3: migration two tables task01 and task02 in dtstest database, db_list should like {"dtstest":{"name":"dtstest","all":false,"Table":{"task01":{"name":"task01","all":true},"task02":{"name":"task02","all":true}}}}.
 
     Returns:
         Dict[str, Any]: Response containing the configured job details.
-    """
+    '''
     try:
         db_list_str = json.dumps(db_list, separators=(',', ':'))
         logger.info(f"Configure dts job with db_list: {db_list_str}")
@@ -130,14 +141,19 @@ async def configure_dts_job(
         create_dts_instance_response = client.create_dts_instance_with_options(create_dts_instance_request, runtime)
         logger.info(f"Create dts instance response: {create_dts_instance_response.body.to_map()}")
         dts_job_id = create_dts_instance_response.body.to_map()['JobId']
-        instance_id = create_dts_instance_response.body.to_map()['InstanceId']
 
         # configure dts job
-        #dblist_suffix = datetime.now().strftime("%Y%m%d%H%M%S")
-        #new_db_list = db_list.replace('#suffix#', dblist_suffix)
+        ran_job_name = 'dtsmcp-' + ''.join(random.sample(string.ascii_letters + string.digits, 6))
+        custom_reserved = json.loads(g_reserved)
+        dts_mcp_channel = os.getenv('DTS_MCP_CHANNEL')
+        if dts_mcp_channel and len(dts_mcp_channel) > 0:
+            logger.info(f"Configure dts job with custom dts mcp channel: {dts_mcp_channel}")
+            custom_reserved['channelInfo'] = dts_mcp_channel
+        custom_reserved_str = json.dumps(custom_reserved, separators=(',', ':'))
+        logger.info(f"Configure dts job with reserved: {custom_reserved_str}")
         configure_dts_job_request = dts_20200101_models.ConfigureDtsJobRequest(
             region_id=region_id,
-            dts_job_name='bingyutest',
+            dts_job_name=ran_job_name,
             source_endpoint_instance_type=source_endpoint_instance_type,
             source_endpoint_engine_name=source_endpoint_engine_name,
             source_endpoint_instance_id=source_endpoint_instance_id,
@@ -155,12 +171,12 @@ async def configure_dts_job(
             data_synchronization=False,
             job_type=job_type,
             db_list=db_list_str,
-            reserve=g_reserved
+            reserve=custom_reserved_str
         )
 
-        if len(dts_job_id) > 0:
+        if dts_job_id and len(dts_job_id) > 0:
             configure_dts_job_request.dts_job_id = dts_job_id
-            
+
         configure_dts_job_response = client.configure_dts_job_with_options(configure_dts_job_request, runtime)
         logger.info(f"Configure dts job response: {configure_dts_job_response.body.to_map()}")
         return configure_dts_job_response.body.to_map()
@@ -169,7 +185,7 @@ async def configure_dts_job(
         logger.error(f"Error occurred while configure dts job: {str(e)}")
         raise e
 
-@mcp.tool(name="start_dts_job",
+@mcp.tool(name="startDtsJob",
           description="Start a dts job.",
           annotations={"title": "启动DTS任务", "readOnlyHint": False, "destructiveHint": False})
 async def start_dts_job(
@@ -201,7 +217,7 @@ async def start_dts_job(
         logger.error(f"Error occurred while start dts job: {str(e)}")
         raise e
 
-@mcp.tool(name="describe_dts_job_detail",
+@mcp.tool(name="getDtsJob",
           description="Get a dts job detail information.",
           annotations={"title": "查询DTS任务详细信息", "readOnlyHint": True})
 async def describe_dts_job_detail(
@@ -233,29 +249,11 @@ async def describe_dts_job_detail(
         logger.error(f"Error occurred while describe dts job detail: {str(e)}")
         raise e
 
-@mcp.tool()
-async def get_current_time() -> Dict[str, Any]:
-    """Get the current time.
 
-    Returns:
-        Dict[str, Any]: The response containing the current time.
-    """
-    try:
-        # Get the current time
-        current_time = datetime.now()
-
-        # Format the current time as a string
-        formatted_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
-
-        # Return the response
-        return {
-            "current_time": formatted_time
-        }
-    except Exception as e:
-        logger.error(f"Error occurred while getting the current time: {str(e)}")
-        raise Exception(f"Failed to get the current time: {str(e)}")
+def main():
+    mcp.run(transport=os.getenv('SERVER_TRANSPORT', 'stdio'))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     # Initialize and run the server
-    mcp.run(transport='sse')
+    main()
